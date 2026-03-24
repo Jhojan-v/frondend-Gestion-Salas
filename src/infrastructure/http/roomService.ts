@@ -1,22 +1,45 @@
-const BASE_URL = "http://localhost:8090";
+import { API_BASE_URL } from './apiConfig'
 
 export const crearSala = async (datos: {
-  nombre: string;
-  ubicacion: string;
-  capacidad: number;
-  facultad: string;
+  nombre: string
+  ubicacion: string
+  capacidad: number
+  facultad: string
 }) => {
-  const response = await fetch(`${BASE_URL}/salas`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(datos),
-  });
+  let response: Response
 
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.mensaje || data.message || "Error al crear la sala");
+  try {
+    response = await fetch(`${API_BASE_URL}/api/salas`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Usuario-Id': '1',
+        'X-Facultad-Id': '1',
+        'X-Rol': 'SECRETARIA',
+      },
+      body: JSON.stringify({
+        nombre: datos.nombre,
+        ubicacion: datos.ubicacion,
+        capacidad: datos.capacidad,
+        facultad: datos.facultad,
+      }),
+    })
+  } catch {
+    throw new Error('No fue posible conectar con el backend en http://localhost:8080.')
   }
 
-  return data;
-};
+  if (response.status === 405) {
+    throw new Error(
+      'El backend actual no tiene habilitado un endpoint POST para crear salas todavía.',
+    )
+  }
+
+  const rawBody = await response.text()
+  const data = rawBody ? JSON.parse(rawBody) : null
+
+  if (!response.ok) {
+    throw new Error(data?.mensaje || data?.message || 'Error al crear la sala')
+  }
+
+  return data
+}

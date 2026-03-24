@@ -1,90 +1,108 @@
-import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
-import { iniciarSesion } from "../../infrastructure/http/authService";
-import { useAuth } from "../../shared/context/AuthContext";
-import "../../styles/RegisterPage.css";
+import { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { iniciarSesion } from '../../infrastructure/http/authService'
+import { getNombreFacultad } from '../../shared/constants/facultades'
+import { useAuth } from '../../shared/context/AuthContext'
+import '../../styles/RegisterPage.css'
 
 const validarCorreo = (v: string) => {
-  if (!v) return "El correo es obligatorio.";
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return "El formato del correo no es válido.";
-  return "";
-};
+  if (!v) return 'El correo es obligatorio.'
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return 'El formato del correo no es válido.'
+  return ''
+}
 
 const validarContrasena = (v: string) => {
-  if (!v) return "La contraseña es obligatoria.";
-  return "";
-};
+  if (!v) return 'La contraseña es obligatoria.'
+  return ''
+}
 
 export default function LoginPage() {
-  const navigate = useNavigate();
-  const { guardarSesion } = useAuth();
+  const navigate = useNavigate()
+  const { guardarSesion } = useAuth()
 
-  const [form, setForm] = useState({ correo: "", contrasena: "" });
-  const [errores, setErrores] = useState({ correo: "", contrasena: "" });
-  const [alerta, setAlerta] = useState({ tipo: "", mensaje: "" });
-  const [cargando, setCargando] = useState(false);
+  const [form, setForm] = useState({ correo: '', contrasena: '' })
+  const [errores, setErrores] = useState({ correo: '', contrasena: '' })
+  const [alerta, setAlerta] = useState({ tipo: '', mensaje: '' })
+  const [cargando, setCargando] = useState(false)
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setForm((p) => ({ ...p, [name]: value }));
-    if (errores[name as keyof typeof errores]) setErrores((p) => ({ ...p, [name]: "" }));
-    if (alerta.mensaje) setAlerta({ tipo: "", mensaje: "" });
-  };
+    const { name, value } = e.target
+    setForm((prev) => ({ ...prev, [name]: value }))
+
+    if (errores[name as keyof typeof errores]) {
+      setErrores((prev) => ({ ...prev, [name]: '' }))
+    }
+
+    if (alerta.mensaje) {
+      setAlerta({ tipo: '', mensaje: '' })
+    }
+  }
 
   const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    const fns = { correo: validarCorreo, contrasena: validarContrasena };
-    setErrores((p) => ({ ...p, [name]: fns[name as keyof typeof fns](value) }));
-  };
+    const { name, value } = e.target
+    const validators = { correo: validarCorreo, contrasena: validarContrasena }
+    setErrores((prev) => ({
+      ...prev,
+      [name]: validators[name as keyof typeof validators](value),
+    }))
+  }
 
   const validarTodo = () => {
     const nuevo = {
       correo: validarCorreo(form.correo),
       contrasena: validarContrasena(form.contrasena),
-    };
-    setErrores(nuevo);
-    return !Object.values(nuevo).some(Boolean);
-  };
+    }
+
+    setErrores(nuevo)
+    return !Object.values(nuevo).some(Boolean)
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!validarTodo()) return;
-    setCargando(true);
-    setAlerta({ tipo: "", mensaje: "" });
+    e.preventDefault()
+
+    if (!validarTodo()) {
+      return
+    }
+
+    setCargando(true)
+    setAlerta({ tipo: '', mensaje: '' })
+
     try {
       const data = await iniciarSesion({
-        correo: form.correo,
+        correo: form.correo.trim().toLowerCase(),
         contrasena: form.contrasena,
-      });
+      })
 
       guardarSesion({
-        correo: data.email,
-        facultad: data.facultad,
+        correo: data.correo,
+        facultad: data.facultad || getNombreFacultad(data.idFacultad),
+        idFacultad: data.idFacultad,
         rol: data.rol,
-      });
+        token: data.token,
+      })
 
       setAlerta({
-        tipo: "exito",
+        tipo: 'exito',
         mensaje: `¡Bienvenido! Ingresando como ${data.rol}...`,
-      });
+      })
 
       setTimeout(() => {
-        if (data.rol === "SECRETARIA") {
-          navigate("/dashboard-secretaria");
-        } else {
-          navigate("/dashboard-docente");
+        if (data.rol === 'SECRETARIA') {
+          navigate('/dashboard-secretaria')
+          return
         }
-      }, 1500);
 
+        navigate('/dashboard-docente')
+      }, 1500)
     } catch (err: any) {
       setAlerta({
-        tipo: "error",
-        mensaje: err.message || "Correo o contraseña incorrectos.",
-      });
+        tipo: 'error',
+        mensaje: err.message || 'Correo o contraseña incorrectos.',
+      })
     } finally {
-      setCargando(false);
+      setCargando(false)
     }
-  };
+  }
 
   return (
     <div className="auth-screen">
@@ -100,7 +118,7 @@ export default function LoginPage() {
 
         {alerta.mensaje && (
           <div className={`alerta alerta-${alerta.tipo}`}>
-            <span>{alerta.tipo === "exito" ? "✓" : "!"}</span>
+            <span>{alerta.tipo === 'exito' ? '✓' : '!'}</span>
             <span>{alerta.mensaje}</span>
           </div>
         )}
@@ -109,31 +127,45 @@ export default function LoginPage() {
           <div className="campo">
             <label htmlFor="correo">Correo institucional</label>
             <input
-              id="correo" name="correo" type="email"
-              value={form.correo} onChange={handleChange} onBlur={handleBlur}
+              id="correo"
+              name="correo"
+              type="email"
+              value={form.correo}
+              onChange={handleChange}
+              onBlur={handleBlur}
               placeholder="usuario@uao.edu.co"
-              className={errores.correo ? "error" : ""}
+              className={errores.correo ? 'error' : ''}
             />
             {errores.correo && (
-              <p className="msg-error"><span>⚠</span>{errores.correo}</p>
+              <p className="msg-error">
+                <span>⚠</span>
+                {errores.correo}
+              </p>
             )}
           </div>
 
           <div className="campo">
             <label htmlFor="contrasena">Contraseña</label>
             <input
-              id="contrasena" name="contrasena" type="password"
-              value={form.contrasena} onChange={handleChange} onBlur={handleBlur}
+              id="contrasena"
+              name="contrasena"
+              type="password"
+              value={form.contrasena}
+              onChange={handleChange}
+              onBlur={handleBlur}
               placeholder="Tu contraseña"
-              className={errores.contrasena ? "error" : ""}
+              className={errores.contrasena ? 'error' : ''}
             />
             {errores.contrasena && (
-              <p className="msg-error"><span>⚠</span>{errores.contrasena}</p>
+              <p className="msg-error">
+                <span>⚠</span>
+                {errores.contrasena}
+              </p>
             )}
           </div>
 
           <button type="submit" className="btn-primary" disabled={cargando}>
-            {cargando ? "Ingresando..." : "Iniciar sesión"}
+            {cargando ? 'Ingresando...' : 'Iniciar sesión'}
           </button>
         </form>
 
@@ -142,7 +174,7 @@ export default function LoginPage() {
         </p>
       </div>
 
-      <p className="info-horario">Horario de reservas: 7:00 AM – 9:30 PM</p>
+      <p className="info-horario">Horario de reservas: 7:00 AM - 9:30 PM</p>
     </div>
-  );
+  )
 }

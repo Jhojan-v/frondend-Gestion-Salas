@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
+import { useAuth } from '../../shared/context/AuthContext'
 import './home-page.css'
 
 type SalaResumen = {
@@ -37,13 +38,6 @@ type RecursoSalaResponse = {
 }
 
 const API_URL = 'http://localhost:8080/api/salas'
-const headers = {
-  'Content-Type': 'application/json',
-  'X-Usuario-Id': '1',
-  'X-Facultad-Id': '1',
-  'X-Rol': 'SECRETARIA',
-}
-
 const emptyEditForm = {
   nombre: '',
   ubicacion: '',
@@ -57,6 +51,7 @@ const emptyResourceForm = {
 }
 
 function HomePage() {
+  const { usuario } = useAuth()
   const [salas, setSalas] = useState<SalaResumen[]>([])
   const [selectedSalaId, setSelectedSalaId] = useState<number | null>(null)
   const [selectedSala, setSelectedSala] = useState<SalaDetalle | null>(null)
@@ -66,6 +61,13 @@ function HomePage() {
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('Cargando salas...')
   const [error, setError] = useState('')
+
+  const headers = {
+    'Content-Type': 'application/json',
+    'X-Usuario-Id': '1',
+    'X-Facultad-Id': String(usuario?.idFacultad ?? 1),
+    'X-Rol': usuario?.rol ?? 'SECRETARIA',
+  }
 
   useEffect(() => {
     void loadSalas()
