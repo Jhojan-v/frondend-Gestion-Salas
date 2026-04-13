@@ -1,10 +1,33 @@
 export const FACULTADES = [
-  { id: 3, nombre: 'Facultad de Ingeniería y Ciencias Básicas' },
-  { id: 4, nombre: 'Facultad de Comunicación Social, Humanidades y Artes' },
-  { id: 5, nombre: 'Facultad de Arquitectura, Urbanismo y Diseño' },
-  { id: 6, nombre: 'Facultad de Administración' },
+  { id: 1, nombre: 'Facultad de Ingenieria y Ciencias Basicas' },
+  { id: 2, nombre: 'Facultad de Comunicacion Social, Humanidades y Artes' },
+  { id: 3, nombre: 'Facultad de Arquitectura, Urbanismo y Diseno' },
+  { id: 4, nombre: 'Facultad de Administracion' },
 ]
 
 export function getNombreFacultad(idFacultad: number | null | undefined) {
   return FACULTADES.find((facultad) => facultad.id === idFacultad)?.nombre ?? ''
+}
+
+export function resolverNombreFacultad(
+  facultad: string | null | undefined,
+  idFacultad: number | null | undefined,
+) {
+  const nombreBackend = facultad?.trim()
+
+  if (nombreBackend) {
+    return nombreBackend
+  }
+
+  const nombreCatalogo = getNombreFacultad(idFacultad)
+
+  if (nombreCatalogo) {
+    return nombreCatalogo
+  }
+
+  if (idFacultad !== null && idFacultad !== undefined) {
+    return `Facultad ID ${idFacultad}`
+  }
+
+  return 'Sin facultad asignada'
 }

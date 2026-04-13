@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { iniciarSesion } from '../../infrastructure/http/authService'
-import { getNombreFacultad } from '../../shared/constants/facultades'
+import { resolverNombreFacultad } from '../../shared/constants/facultades'
 import { useAuth } from '../../shared/context/AuthContext'
 import '../../styles/RegisterPage.css'
 
@@ -75,7 +75,7 @@ export default function LoginPage() {
 
       guardarSesion({
         correo: data.correo,
-        facultad: data.facultad || getNombreFacultad(data.idFacultad),
+        facultad: resolverNombreFacultad(data.facultad, data.idFacultad),
         idFacultad: data.idFacultad,
         rol: data.rol,
         token: data.token,
