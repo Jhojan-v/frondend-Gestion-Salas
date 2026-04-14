@@ -1,43 +1,19 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
+import {
+  actualizarEstadoSala,
+  actualizarSala,
+  agregarRecursoSala,
+  listarSalas,
+  obtenerSalaDetalle,
+  type SalaDetalle,
+  type SalaResumen,
+} from '../../infrastructure/http/roomService'
+import { resolverNombreFacultad } from '../../shared/constants/facultades'
 import { useAuth } from '../../shared/context/AuthContext'
 import './home-page.css'
 
-type SalaResumen = {
-  idSala: number
-  nombre: string
-  ubicacion: string
-  capacidad: number
-  habilitada: boolean
-}
-
-type RecursoSala = {
-  idRecursoSala: number
-  codigoRecurso: string
-  nombreRecurso: string
-  cantidad: number
-}
-
-type SalaDetalle = SalaResumen & {
-  facultadId: number
-  recursos: RecursoSala[]
-}
-
-type EstadoSalaResponse = {
-  idSala: number
-  habilitada: boolean
-  mensaje: string
-}
-
-type RecursoSalaResponse = {
-  idRecursoSala: number
-  codigoRecurso: string
-  nombreRecurso: string
-  cantidad: number
-  mensaje: string
-}
-
-const API_URL = 'http://localhost:8080/api/salas'
 const emptyEditForm = {
   nombre: '',
   ubicacion: '',
@@ -50,104 +26,255 @@ const emptyResourceForm = {
   cantidad: 1,
 }
 
+const emptyEditErrors = {
+  nombre: '',
+  ubicacion: '',
+  capacidad: '',
+}
+
+const emptyResourceErrors = {
+  codigoRecurso: '',
+  nombreRecurso: '',
+  cantidad: '',
+}
+
+type AlertState = {
+  tipo: '' | 'error' | 'exito' | 'info'
+  mensaje: string
+}
+
+function validarNombre(nombre: string) {
+  const value = nombre.trim()
+
+  if (!value) {
+    return 'El nombre de la sala es obligatorio.'
+  }
+
+  if (value.length < 3) {
+    return 'Minimo 3 caracteres.'
+  }
+
+  return ''
+}
+
+function validarUbicacion(ubicacion: string) {
+  return ubicacion.trim() ? '' : 'La ubicacion es obligatoria.'
+}
+
+function validarCapacidad(capacidad: number) {
+  if (!Number.isFinite(capacidad)) {
+    return 'La capacidad debe ser numerica.'
+  }
+
+  if (capacidad < 2 || capacidad > 100) {
+    return 'La capacidad debe estar entre 2 y 100.'
+  }
+
+  return ''
+}
+
+function validarCodigoRecurso(codigo: string) {
+  return codigo.trim() ? '' : 'El codigo del recurso es obligatorio.'
+}
+
+function validarNombreRecurso(nombre: string) {
+  return nombre.trim() ? '' : 'El nombre del recurso es obligatorio.'
+}
+
+function validarCantidad(cantidad: number) {
+  if (!Number.isFinite(cantidad)) {
+    return 'La cantidad debe ser numerica.'
+  }
+
+  if (cantidad < 1) {
+    return 'La cantidad minima debe ser 1.'
+  }
+
+  return ''
+}
+
 function HomePage() {
-  const { usuario } = useAuth()
+  const navigate = useNavigate()
+  const { usuario, cerrarSesion } = useAuth()
+
   const [salas, setSalas] = useState<SalaResumen[]>([])
   const [selectedSalaId, setSelectedSalaId] = useState<number | null>(null)
   const [selectedSala, setSelectedSala] = useState<SalaDetalle | null>(null)
   const [editForm, setEditForm] = useState(emptyEditForm)
   const [resourceForm, setResourceForm] = useState(emptyResourceForm)
+  const [editErrors, setEditErrors] = useState(emptyEditErrors)
+  const [resourceErrors, setResourceErrors] = useState(emptyResourceErrors)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [message, setMessage] = useState('Cargando salas...')
-  const [error, setError] = useState('')
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [savingEdit, setSavingEdit] = useState(false)
+  const [savingStatus, setSavingStatus] = useState(false)
+  const [savingResource, setSavingResource] = useState(false)
+  const [alerta, setAlerta] = useState<AlertState>({
+    tipo: 'info',
+    mensaje: 'Cargando salas...',
+  })
 
-  const headers = {
-    'Content-Type': 'application/json',
-    'X-Usuario-Id': '1',
-    'X-Facultad-Id': String(usuario?.idFacultad ?? 1),
-    'X-Rol': usuario?.rol ?? 'SECRETARIA',
-  }
+  const facultadNombre = resolverNombreFacultad(usuario?.facultad, usuario?.idFacultad)
+
+  const salasFiltradas = salas.filter((sala) => {
+    const term = search.trim().toLowerCase()
+
+    if (!term) {
+      return true
+    }
+
+    return (
+      sala.nombre.toLowerCase().includes(term) ||
+      sala.ubicacion.toLowerCase().includes(term)
+    )
+  })
 
   useEffect(() => {
-    void loadSalas()
+    void cargarSalas()
+  }, [usuario?.idFacultad, usuario?.rol])
+
+  useEffect(() => {
+    const root = document.getElementById('root')
+    root?.classList.add('dashboard-root')
+
+    return () => {
+      root?.classList.remove('dashboard-root')
+    }
   }, [])
 
   useEffect(() => {
     if (selectedSalaId !== null) {
-      void loadSalaDetalle(selectedSalaId)
+      void cargarDetalle(selectedSalaId)
+    } else {
+      setSelectedSala(null)
     }
-  }, [selectedSalaId])
+  }, [selectedSalaId, usuario?.idFacultad, usuario?.rol])
 
-  async function parseResponse<T>(response: Response): Promise<T> {
-    if (!response.ok) {
-      const errorBody = await response.json().catch(() => null)
-      throw new Error(errorBody?.message ?? 'No fue posible completar la solicitud')
-    }
-
-    return response.json() as Promise<T>
-  }
-
-  async function loadSalas() {
+  async function cargarSalas() {
     try {
       setLoading(true)
-      setError('')
-      const response = await fetch(API_URL, { headers })
-      const data = await parseResponse<SalaResumen[]>(response)
+      const data = await listarSalas(usuario)
       setSalas(data)
-      setMessage(`${data.length} salas cargadas correctamente`)
+      setSelectedSalaId((current) => {
+        if (!data.length) {
+          return null
+        }
 
-      if (data.length > 0) {
-        setSelectedSalaId((current) => current ?? data[0].idSala)
-      }
-    } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : 'Error inesperado')
-      setMessage('No se pudieron cargar las salas')
+        if (current !== null && data.some((sala) => sala.idSala === current)) {
+          return current
+        }
+
+        return data[0].idSala
+      })
+      setAlerta({
+        tipo: 'info',
+        mensaje: data.length
+          ? `${data.length} salas cargadas correctamente.`
+          : 'No hay salas registradas para la facultad actual.',
+      })
+    } catch (error) {
+      setAlerta({
+        tipo: 'error',
+        mensaje: error instanceof Error ? error.message : 'No se pudieron cargar las salas.',
+      })
     } finally {
       setLoading(false)
     }
   }
 
-  async function loadSalaDetalle(idSala: number) {
+  async function cargarDetalle(idSala: number) {
     try {
-      setError('')
-      const response = await fetch(`${API_URL}/${idSala}`, { headers })
-      const data = await parseResponse<SalaDetalle>(response)
+      setDetailLoading(true)
+      const data = await obtenerSalaDetalle(idSala, usuario)
       setSelectedSala(data)
       setEditForm({
         nombre: data.nombre,
         ubicacion: data.ubicacion,
         capacidad: data.capacidad,
       })
-    } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : 'Error inesperado')
+      setEditErrors(emptyEditErrors)
+    } catch (error) {
+      setAlerta({
+        tipo: 'error',
+        mensaje:
+          error instanceof Error
+            ? error.message
+            : 'No fue posible consultar el detalle de la sala.',
+      })
+    } finally {
+      setDetailLoading(false)
     }
+  }
+
+  function validarEdicion() {
+    const errores = {
+      nombre: validarNombre(editForm.nombre),
+      ubicacion: validarUbicacion(editForm.ubicacion),
+      capacidad: validarCapacidad(editForm.capacidad),
+    }
+
+    setEditErrors(errores)
+    return !Object.values(errores).some(Boolean)
+  }
+
+  function validarRecurso() {
+    const errores = {
+      codigoRecurso: validarCodigoRecurso(resourceForm.codigoRecurso),
+      nombreRecurso: validarNombreRecurso(resourceForm.nombreRecurso),
+      cantidad: validarCantidad(resourceForm.cantidad),
+    }
+
+    setResourceErrors(errores)
+    return !Object.values(errores).some(Boolean)
   }
 
   async function handleEditSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
-    if (selectedSalaId === null) {
+    if (!selectedSala || !validarEdicion()) {
       return
     }
 
     try {
-      setSaving(true)
-      setError('')
-      const response = await fetch(`${API_URL}/${selectedSalaId}`, {
-        method: 'PUT',
-        headers,
-        body: JSON.stringify(editForm),
-      })
+      setSavingEdit(true)
+      const data = await actualizarSala(
+        selectedSala.idSala,
+        {
+          nombre: editForm.nombre.trim(),
+          ubicacion: editForm.ubicacion.trim(),
+          capacidad: editForm.capacidad,
+        },
+        usuario,
+      )
 
-      const data = await parseResponse<SalaDetalle>(response)
       setSelectedSala(data)
-      setMessage('Sala actualizada correctamente')
-      await loadSalas()
-    } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : 'Error inesperado')
+      setSalas((current) =>
+        current.map((sala) =>
+          sala.idSala === data.idSala
+            ? {
+                idSala: data.idSala,
+                nombre: data.nombre,
+                ubicacion: data.ubicacion,
+                capacidad: data.capacidad,
+                habilitada: data.habilitada,
+              }
+            : sala,
+        ),
+      )
+      setAlerta({
+        tipo: 'exito',
+        mensaje: 'La sala fue actualizada correctamente.',
+      })
+    } catch (error) {
+      setAlerta({
+        tipo: 'error',
+        mensaje:
+          error instanceof Error ? error.message : 'No fue posible actualizar la sala.',
+      })
     } finally {
-      setSaving(false)
+      setSavingEdit(false)
     }
   }
 
@@ -157,243 +284,436 @@ function HomePage() {
     }
 
     try {
-      setSaving(true)
-      setError('')
-      const response = await fetch(`${API_URL}/${selectedSala.idSala}/estado`, {
-        method: 'PATCH',
-        headers,
-        body: JSON.stringify({ habilitada: !selectedSala.habilitada }),
-      })
+      setSavingStatus(true)
+      const response = await actualizarEstadoSala(
+        selectedSala.idSala,
+        !selectedSala.habilitada,
+        usuario,
+      )
 
-      const data = await parseResponse<EstadoSalaResponse>(response)
-      setMessage(data.mensaje)
-      await loadSalas()
-      await loadSalaDetalle(selectedSala.idSala)
-    } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : 'Error inesperado')
+      await cargarSalas()
+      await cargarDetalle(selectedSala.idSala)
+
+      const detalleReserva =
+        response.reservaCanceladaId !== null
+          ? ` Reserva activa cancelada: #${response.reservaCanceladaId}.`
+          : ''
+
+      setAlerta({
+        tipo: 'exito',
+        mensaje: `${response.mensaje}.${detalleReserva}`.replace('..', '.'),
+      })
+    } catch (error) {
+      setAlerta({
+        tipo: 'error',
+        mensaje:
+          error instanceof Error
+            ? error.message
+            : 'No fue posible cambiar el estado de la sala.',
+      })
     } finally {
-      setSaving(false)
+      setSavingStatus(false)
     }
   }
 
   async function handleResourceSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
-    if (selectedSalaId === null) {
+    if (!selectedSala || !validarRecurso()) {
       return
     }
 
     try {
-      setSaving(true)
-      setError('')
-      const response = await fetch(`${API_URL}/${selectedSalaId}/recursos`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(resourceForm),
-      })
+      setSavingResource(true)
+      const data = await agregarRecursoSala(
+        selectedSala.idSala,
+        {
+          codigoRecurso: resourceForm.codigoRecurso.trim(),
+          nombreRecurso: resourceForm.nombreRecurso.trim(),
+          cantidad: resourceForm.cantidad,
+        },
+        usuario,
+      )
 
-      const data = await parseResponse<RecursoSalaResponse>(response)
-      setMessage(data.mensaje)
       setResourceForm(emptyResourceForm)
-      await loadSalaDetalle(selectedSalaId)
-    } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : 'Error inesperado')
+      setResourceErrors(emptyResourceErrors)
+      await cargarDetalle(selectedSala.idSala)
+      setAlerta({
+        tipo: 'exito',
+        mensaje: data.mensaje,
+      })
+    } catch (error) {
+      setAlerta({
+        tipo: 'error',
+        mensaje:
+          error instanceof Error
+            ? error.message
+            : 'No fue posible agregar el recurso tecnologico.',
+      })
     } finally {
-      setSaving(false)
+      setSavingResource(false)
     }
   }
 
   return (
-    <main className="dashboard-page">
-      <section className="dashboard-hero">
-        <div>
-          <p className="eyebrow">Gestion de salas</p>
-          <h1>Conectado al backend real</h1>
-          <p className="hero-copy">
-            Esta vista consume el backend en tiempo real para listar, editar, habilitar
-            o deshabilitar salas y agregar recursos tecnologicos.
-          </p>
+    <div className="secretaria-dashboard">
+      <aside className={`dashboard-sidebar ${sidebarOpen ? '' : 'dashboard-sidebar-collapsed'}`}>
+        <button
+          type="button"
+          className="sidebar-toggle"
+          onClick={() => setSidebarOpen((current) => !current)}
+          aria-label={sidebarOpen ? 'Contraer barra lateral' : 'Expandir barra lateral'}
+        >
+          {sidebarOpen ? 'Ocultar' : 'Menu'}
+        </button>
+
+        <div className="sidebar-brand">
+          <h2>{sidebarOpen ? 'Sistema de Reservas' : 'SR'}</h2>
+          {sidebarOpen ? <p>Universidad UAO</p> : null}
         </div>
-        <div className="status-card">
-          <span className="status-label">Estado</span>
-          <strong>{loading ? 'Sincronizando...' : 'Backend activo'}</strong>
-          <p>{message}</p>
-        </div>
-      </section>
 
-      {error ? <div className="banner banner-error">{error}</div> : null}
+        <nav className="sidebar-menu">
+          <button
+            type="button"
+            className="sidebar-link sidebar-link-active"
+            aria-label="Dashboard secretaria"
+          >
+            <span>{sidebarOpen ? 'Dashboard secretaria' : 'Inicio'}</span>
+          </button>
+          <button
+            type="button"
+            className="sidebar-link"
+            onClick={() => navigate('/crear-sala')}
+            aria-label="Crear sala"
+          >
+            <span>{sidebarOpen ? 'Crear sala' : 'Crear'}</span>
+          </button>
+          <button
+            type="button"
+            className="sidebar-link"
+            onClick={() => void cargarSalas()}
+            aria-label="Recargar salas"
+          >
+            <span>{sidebarOpen ? 'Recargar salas' : 'Sync'}</span>
+          </button>
+        </nav>
 
-      <section className="dashboard-grid">
-        <article className="panel salas-panel">
-          <div className="panel-head">
-            <h2>Salas disponibles</h2>
-            <button type="button" className="ghost-button" onClick={() => void loadSalas()}>
-              Recargar
-            </button>
-          </div>
-
-          <div className="salas-list">
-            {salas.map((sala) => (
-              <button
-                key={sala.idSala}
-                type="button"
-                className={`sala-item ${selectedSalaId === sala.idSala ? 'active' : ''}`}
-                onClick={() => setSelectedSalaId(sala.idSala)}
-              >
-                <div>
-                  <strong>{sala.nombre}</strong>
-                  <span>{sala.ubicacion}</span>
-                </div>
-                <span className={`badge ${sala.habilitada ? 'enabled' : 'disabled'}`}>
-                  {sala.habilitada ? 'Habilitada' : 'Deshabilitada'}
-                </span>
-              </button>
-            ))}
-          </div>
-        </article>
-
-        <article className="panel detail-panel">
-          <div className="panel-head">
-            <h2>Detalle y edicion</h2>
-            {selectedSala ? (
-              <button type="button" className="primary-button" onClick={handleToggleStatus} disabled={saving}>
-                {selectedSala.habilitada ? 'Deshabilitar sala' : 'Habilitar sala'}
-              </button>
-            ) : null}
-          </div>
-
-          {selectedSala ? (
+        <div className="sidebar-user">
+          <strong>{usuario?.correo ?? 'Sin sesion'}</strong>
+          {sidebarOpen ? (
             <>
-              <div className="detail-summary">
-                <div>
-                  <span>Facultad</span>
-                  <strong>{selectedSala.facultadId}</strong>
+              <span>{usuario?.rol ?? 'Sin rol'}</span>
+              <span>{facultadNombre}</span>
+            </>
+          ) : null}
+        </div>
+
+        <button
+          type="button"
+          className="sidebar-logout"
+          onClick={() => {
+            cerrarSesion()
+            navigate('/login')
+          }}
+        >
+          {sidebarOpen ? 'Cerrar sesion' : 'Salir'}
+        </button>
+      </aside>
+
+      <section className="dashboard-main">
+        <header className="dashboard-header">
+          <div>
+            <h1>Panel de secretaria</h1>
+            <p className="dashboard-subtitle">
+              Administra salas y recursos de tu facultad desde una sola vista.
+            </p>
+          </div>
+
+          <div className="dashboard-header-card">
+            <span>Facultad</span>
+            <strong>{facultadNombre}</strong>
+            <p>{loading ? 'Sincronizando informacion...' : alerta.mensaje}</p>
+          </div>
+        </header>
+
+        {alerta.mensaje ? (
+          <div className={`dashboard-alert dashboard-alert-${alerta.tipo || 'info'}`}>
+            {alerta.mensaje}
+          </div>
+        ) : null}
+
+        <section className="dashboard-summary">
+          <article className="summary-card">
+            <span>Salas</span>
+            <strong>{salas.length}</strong>
+          </article>
+          <article className="summary-card">
+            <span>Habilitadas</span>
+            <strong>{salas.filter((sala) => sala.habilitada).length}</strong>
+          </article>
+          <article className="summary-card">
+            <span>Deshabilitadas</span>
+            <strong>{salas.filter((sala) => !sala.habilitada).length}</strong>
+          </article>
+        </section>
+
+        <section className="dashboard-grid">
+          <article className="dashboard-card">
+            <div className="card-head">
+              <div>
+                <h2>Listado de salas</h2>
+                <p>Selecciona una sala para consultar su detalle.</p>
+              </div>
+              <span className="card-badge">
+                {loading ? 'Cargando...' : `${salasFiltradas.length} visibles`}
+              </span>
+            </div>
+
+            <label className="dashboard-field">
+              <span>Buscar sala</span>
+              <input
+                type="search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Nombre o ubicacion"
+              />
+            </label>
+
+            <div className="salas-list">
+              {salasFiltradas.length ? (
+                salasFiltradas.map((sala) => (
+                  <button
+                    key={sala.idSala}
+                    type="button"
+                    className={`sala-item ${selectedSalaId === sala.idSala ? 'active' : ''}`}
+                    onClick={() => setSelectedSalaId(sala.idSala)}
+                  >
+                    <div>
+                      <strong>{sala.nombre}</strong>
+                      <span>{sala.ubicacion}</span>
+                    </div>
+                    <span className={`badge ${sala.habilitada ? 'enabled' : 'disabled'}`}>
+                      {sala.habilitada ? 'Habilitada' : 'Deshabilitada'}
+                    </span>
+                  </button>
+                ))
+              ) : (
+                <p className="empty-state">No hay salas que coincidan con la busqueda.</p>
+              )}
+            </div>
+          </article>
+
+          <article className="dashboard-card">
+            <div className="card-head">
+              <div>
+                <h2>Detalle y edicion</h2>
+                <p>Informacion actual de la sala seleccionada.</p>
+              </div>
+              {selectedSala ? (
+                <button
+                  type="button"
+                  className={`action-button ${selectedSala.habilitada ? 'danger' : 'success'}`}
+                  onClick={handleToggleStatus}
+                  disabled={savingStatus || detailLoading}
+                >
+                  {savingStatus
+                    ? 'Actualizando...'
+                    : selectedSala.habilitada
+                      ? 'Deshabilitar sala'
+                      : 'Habilitar sala'}
+                </button>
+              ) : null}
+            </div>
+
+            {detailLoading ? (
+              <p className="empty-state">Cargando detalle de la sala...</p>
+            ) : selectedSala ? (
+              <>
+                <div className="detail-summary">
+                  <div>
+                    <span>Facultad</span>
+                    <strong>{facultadNombre}</strong>
+                  </div>
+                  <div>
+                    <span>Capacidad</span>
+                    <strong>{selectedSala.capacidad}</strong>
+                  </div>
+                  <div>
+                    <span>Estado</span>
+                    <strong>{selectedSala.habilitada ? 'Disponible' : 'No disponible'}</strong>
+                  </div>
                 </div>
+
+                {!selectedSala.habilitada ? (
+                  <div className="info-box">
+                    La sala esta deshabilitada. El backend bloquea la edicion y la asignacion
+                    de recursos hasta volver a habilitarla.
+                  </div>
+                ) : null}
+
+                <form className="form-card" onSubmit={handleEditSubmit}>
+                  <h3>Editar sala</h3>
+
+                  <label className="dashboard-field">
+                    <span>Nombre</span>
+                    <input
+                      value={editForm.nombre}
+                      disabled={!selectedSala.habilitada}
+                      onChange={(event) =>
+                        setEditForm((current) => ({ ...current, nombre: event.target.value }))
+                      }
+                    />
+                    {editErrors.nombre ? <small>{editErrors.nombre}</small> : null}
+                  </label>
+
+                  <label className="dashboard-field">
+                    <span>Ubicacion</span>
+                    <input
+                      value={editForm.ubicacion}
+                      disabled={!selectedSala.habilitada}
+                      onChange={(event) =>
+                        setEditForm((current) => ({
+                          ...current,
+                          ubicacion: event.target.value,
+                        }))
+                      }
+                    />
+                    {editErrors.ubicacion ? <small>{editErrors.ubicacion}</small> : null}
+                  </label>
+
+                  <label className="dashboard-field">
+                    <span>Capacidad</span>
+                    <input
+                      type="number"
+                      min={2}
+                      max={100}
+                      value={editForm.capacidad}
+                      disabled={!selectedSala.habilitada}
+                      onChange={(event) =>
+                        setEditForm((current) => ({
+                          ...current,
+                          capacidad: Number(event.target.value),
+                        }))
+                      }
+                    />
+                    {editErrors.capacidad ? <small>{editErrors.capacidad}</small> : null}
+                  </label>
+
+                  <button
+                    type="submit"
+                    className="action-button"
+                    disabled={savingEdit || !selectedSala.habilitada}
+                  >
+                    {savingEdit ? 'Guardando...' : 'Guardar cambios'}
+                  </button>
+                </form>
+              </>
+            ) : (
+              <p className="empty-state">Selecciona una sala para revisar su detalle.</p>
+            )}
+          </article>
+        </section>
+
+        <section className="dashboard-grid dashboard-grid-secondary">
+          <article className="dashboard-card">
+            <div className="card-head">
+              <div>
+                <h2>Recursos asignados</h2>
+                <p>Listado actual de recursos de la sala seleccionada.</p>
+              </div>
+            </div>
+
+            {selectedSala?.recursos.length ? (
+              <div className="resource-table">
+                {selectedSala.recursos.map((recurso) => (
+                  <div key={recurso.idRecursoSala} className="resource-row">
+                    <div>
+                      <strong>{recurso.nombreRecurso}</strong>
+                      <span>{recurso.codigoRecurso}</span>
+                    </div>
+                    <span className="quantity-pill">x{recurso.cantidad}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="empty-state">
+                Esta sala aun no tiene recursos tecnologicos asignados.
+              </p>
+            )}
+          </article>
+
+          <article className="dashboard-card">
+            <form className="form-card" onSubmit={handleResourceSubmit}>
+              <div className="card-head">
                 <div>
-                  <span>Capacidad</span>
-                  <strong>{selectedSala.capacidad}</strong>
-                </div>
-                <div>
-                  <span>Ubicacion</span>
-                  <strong>{selectedSala.ubicacion}</strong>
+                  <h2>Agregar recurso tecnologico</h2>
+                  <p>Si el codigo ya existe, el backend actualiza la cantidad.</p>
                 </div>
               </div>
 
-              <form className="form-card" onSubmit={handleEditSubmit}>
-                <h3>Editar sala</h3>
+              <label className="dashboard-field">
+                <span>Codigo del recurso</span>
+                <input
+                  value={resourceForm.codigoRecurso}
+                  disabled={!selectedSala || !selectedSala.habilitada}
+                  onChange={(event) =>
+                    setResourceForm((current) => ({
+                      ...current,
+                      codigoRecurso: event.target.value,
+                    }))
+                  }
+                />
+                {resourceErrors.codigoRecurso ? (
+                  <small>{resourceErrors.codigoRecurso}</small>
+                ) : null}
+              </label>
 
-                <label>
-                  Nombre
-                  <input
-                    value={editForm.nombre}
-                    onChange={(event) => setEditForm((current) => ({ ...current, nombre: event.target.value }))}
-                  />
-                </label>
+              <label className="dashboard-field">
+                <span>Nombre del recurso</span>
+                <input
+                  value={resourceForm.nombreRecurso}
+                  disabled={!selectedSala || !selectedSala.habilitada}
+                  onChange={(event) =>
+                    setResourceForm((current) => ({
+                      ...current,
+                      nombreRecurso: event.target.value,
+                    }))
+                  }
+                />
+                {resourceErrors.nombreRecurso ? (
+                  <small>{resourceErrors.nombreRecurso}</small>
+                ) : null}
+              </label>
 
-                <label>
-                  Ubicacion
-                  <input
-                    value={editForm.ubicacion}
-                    onChange={(event) => setEditForm((current) => ({ ...current, ubicacion: event.target.value }))}
-                  />
-                </label>
+              <label className="dashboard-field">
+                <span>Cantidad</span>
+                <input
+                  type="number"
+                  min={1}
+                  value={resourceForm.cantidad}
+                  disabled={!selectedSala || !selectedSala.habilitada}
+                  onChange={(event) =>
+                    setResourceForm((current) => ({
+                      ...current,
+                      cantidad: Number(event.target.value),
+                    }))
+                  }
+                />
+                {resourceErrors.cantidad ? <small>{resourceErrors.cantidad}</small> : null}
+              </label>
 
-                <label>
-                  Capacidad
-                  <input
-                    type="number"
-                    min={2}
-                    max={100}
-                    value={editForm.capacidad}
-                    onChange={(event) =>
-                      setEditForm((current) => ({
-                        ...current,
-                        capacidad: Number(event.target.value),
-                      }))
-                    }
-                  />
-                </label>
-
-                <button type="submit" className="primary-button" disabled={saving}>
-                  Guardar cambios
-                </button>
-              </form>
-            </>
-          ) : (
-            <p className="empty-state">Selecciona una sala para ver su informacion.</p>
-          )}
-        </article>
+              <button
+                type="submit"
+                className="action-button"
+                disabled={savingResource || !selectedSala || !selectedSala.habilitada}
+              >
+                {savingResource ? 'Agregando...' : 'Agregar recurso'}
+              </button>
+            </form>
+          </article>
+        </section>
       </section>
-
-      <section className="dashboard-grid secondary-grid">
-        <article className="panel">
-          <div className="panel-head">
-            <h2>Recursos asignados</h2>
-          </div>
-
-          {selectedSala?.recursos.length ? (
-            <div className="resource-table">
-              {selectedSala.recursos.map((recurso) => (
-                <div key={recurso.idRecursoSala} className="resource-row">
-                  <div>
-                    <strong>{recurso.nombreRecurso}</strong>
-                    <span>{recurso.codigoRecurso}</span>
-                  </div>
-                  <span className="quantity-pill">x{recurso.cantidad}</span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="empty-state">Esta sala aun no tiene recursos tecnologicos asignados.</p>
-          )}
-        </article>
-
-        <article className="panel">
-          <form className="form-card" onSubmit={handleResourceSubmit}>
-            <h3>Agregar recurso tecnologico</h3>
-
-            <label>
-              Codigo del recurso
-              <input
-                value={resourceForm.codigoRecurso}
-                onChange={(event) =>
-                  setResourceForm((current) => ({ ...current, codigoRecurso: event.target.value }))
-                }
-              />
-            </label>
-
-            <label>
-              Nombre del recurso
-              <input
-                value={resourceForm.nombreRecurso}
-                onChange={(event) =>
-                  setResourceForm((current) => ({ ...current, nombreRecurso: event.target.value }))
-                }
-              />
-            </label>
-
-            <label>
-              Cantidad
-              <input
-                type="number"
-                min={1}
-                value={resourceForm.cantidad}
-                onChange={(event) =>
-                  setResourceForm((current) => ({
-                    ...current,
-                    cantidad: Number(event.target.value),
-                  }))
-                }
-              />
-            </label>
-
-            <button type="submit" className="primary-button" disabled={saving || selectedSalaId === null}>
-              Agregar recurso
-            </button>
-          </form>
-        </article>
-      </section>
-    </main>
+    </div>
   )
 }
 
