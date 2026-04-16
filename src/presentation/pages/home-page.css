@@ -38,8 +38,9 @@
 }
 
 .dashboard-sidebar-collapsed {
-  width: 92px;
-  padding-inline: 0.75rem;
+  width: 64px;
+  padding-inline: 0.5rem;
+  align-items: center;
 }
 
 .sidebar-toggle {
@@ -52,6 +53,17 @@
   font-size: 0.76rem;
   font-weight: 600;
   cursor: pointer;
+}
+
+.dashboard-sidebar-collapsed .sidebar-toggle {
+  align-self: center;
+}
+
+.dashboard-sidebar-collapsed .sidebar-brand,
+.dashboard-sidebar-collapsed .sidebar-menu,
+.dashboard-sidebar-collapsed .sidebar-user,
+.dashboard-sidebar-collapsed .sidebar-logout {
+  display: none;
 }
 
 .sidebar-toggle:hover {

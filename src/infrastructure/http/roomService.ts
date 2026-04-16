@@ -206,32 +206,41 @@ export function agregarRecursoSala(
   )
 }
 
-export async function crearSala(datos: CrearSalaPayload) {
+export async function crearSala(datos: CrearSalaPayload, usuario: Usuario | null) {
   let response: Response
 
   try {
     response = await fetch(SALAS_API_URL, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Usuario-Id': DEFAULT_USER_ID,
-        'X-Facultad-Id': '1',
-        'X-Rol': 'SECRETARIA',
-      },
+      headers: getHeaders(usuario),
       body: JSON.stringify(datos),
     })
   } catch {
     throw new Error('No fue posible conectar con el backend en http://localhost:8080.')
   }
 
-  if (response.status === 405) {
+  if (response.status === 404 || response.status === 405) {
     throw new Error(
-      'El backend actual no tiene habilitado un endpoint POST para crear salas todavia.',
+      'El backend actual no tiene habilitado el endpoint para crear salas todavia.',
     )
   }
 
-  return handleResponse<Record<string, unknown>>(
-    response,
-    'No fue posible crear la sala solicitada.',
-  )
+  const rawBody = await response.text()
+  let payload: Record<string, unknown> | ErrorPayload | null = null
+
+  if (rawBody.trim()) {
+    try {
+      payload = JSON.parse(rawBody) as Record<string, unknown> | ErrorPayload
+    } catch {
+      if (!response.ok) {
+        throw new Error(rawBody)
+      }
+    }
+  }
+
+  if (!response.ok) {
+    throw new Error(getErrorMessage(payload as ErrorPayload | null, 'No fue posible crear la sala solicitada.'))
+  }
+
+  return (payload ?? {}) as Record<string, unknown>
 }
