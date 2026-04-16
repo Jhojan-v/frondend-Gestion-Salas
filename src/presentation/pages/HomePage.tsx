@@ -23,7 +23,6 @@ const emptyEditForm = {
 const emptyResourceForm = {
   codigoRecurso: '',
   nombreRecurso: '',
-  cantidad: 1,
 }
 
 const emptyEditErrors = {
@@ -35,7 +34,6 @@ const emptyEditErrors = {
 const emptyResourceErrors = {
   codigoRecurso: '',
   nombreRecurso: '',
-  cantidad: '',
 }
 
 type AlertState = {
@@ -79,18 +77,6 @@ function validarCodigoRecurso(codigo: string) {
 
 function validarNombreRecurso(nombre: string) {
   return nombre.trim() ? '' : 'El nombre del recurso es obligatorio.'
-}
-
-function validarCantidad(cantidad: number) {
-  if (!Number.isFinite(cantidad)) {
-    return 'La cantidad debe ser numerica.'
-  }
-
-  if (cantidad < 1) {
-    return 'La cantidad minima debe ser 1.'
-  }
-
-  return ''
 }
 
 function HomePage() {
@@ -223,7 +209,6 @@ function HomePage() {
     const errores = {
       codigoRecurso: validarCodigoRecurso(resourceForm.codigoRecurso),
       nombreRecurso: validarNombreRecurso(resourceForm.nombreRecurso),
-      cantidad: validarCantidad(resourceForm.cantidad),
     }
 
     setResourceErrors(errores)
@@ -330,7 +315,7 @@ function HomePage() {
         {
           codigoRecurso: resourceForm.codigoRecurso.trim(),
           nombreRecurso: resourceForm.nombreRecurso.trim(),
-          cantidad: resourceForm.cantidad,
+          cantidad: 1,
         },
         usuario,
       )
@@ -545,10 +530,7 @@ function HomePage() {
                 </div>
 
                 {!selectedSala.habilitada ? (
-                  <div className="info-box">
-                    La sala esta deshabilitada. El backend bloquea la edicion y la asignacion
-                    de recursos hasta volver a habilitarla.
-                  </div>
+                  <div className="info-box">La sala esta deshabilitada.</div>
                 ) : null}
 
                 <form className="form-card" onSubmit={handleEditSubmit}>
@@ -631,7 +613,6 @@ function HomePage() {
                       <strong>{recurso.nombreRecurso}</strong>
                       <span>{recurso.codigoRecurso}</span>
                     </div>
-                    <span className="quantity-pill">x{recurso.cantidad}</span>
                   </div>
                 ))}
               </div>
@@ -647,12 +628,11 @@ function HomePage() {
               <div className="card-head">
                 <div>
                   <h2>Agregar recurso tecnologico</h2>
-                  <p>Si el codigo ya existe, el backend actualiza la cantidad.</p>
                 </div>
               </div>
 
               <label className="dashboard-field">
-                <span>Codigo del recurso</span>
+                <span>Identificador del recurso</span>
                 <input
                   value={resourceForm.codigoRecurso}
                   disabled={!selectedSala || !selectedSala.habilitada}
@@ -683,23 +663,6 @@ function HomePage() {
                 {resourceErrors.nombreRecurso ? (
                   <small>{resourceErrors.nombreRecurso}</small>
                 ) : null}
-              </label>
-
-              <label className="dashboard-field">
-                <span>Cantidad</span>
-                <input
-                  type="number"
-                  min={1}
-                  value={resourceForm.cantidad}
-                  disabled={!selectedSala || !selectedSala.habilitada}
-                  onChange={(event) =>
-                    setResourceForm((current) => ({
-                      ...current,
-                      cantidad: Number(event.target.value),
-                    }))
-                  }
-                />
-                {resourceErrors.cantidad ? <small>{resourceErrors.cantidad}</small> : null}
               </label>
 
               <button
