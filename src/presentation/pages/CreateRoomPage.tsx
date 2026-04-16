@@ -6,6 +6,7 @@ import { useAuth } from '../../shared/context/AuthContext'
 import './create-room-page.css'
 import './home-page.css'
 
+// Validaciones de crear sala.
 const validarNombre = (valor: string) => {
   if (!valor.trim()) return 'El nombre es obligatorio.'
   if (valor.trim().length < 3) return 'Minimo 3 caracteres.'
@@ -26,6 +27,7 @@ const validarCapacidad = (valor: string) => {
 }
 
 export default function CreateRoomPage() {
+  // Vista de alta de salas.
   const navigate = useNavigate()
   const { usuario, cerrarSesion } = useAuth()
 
@@ -85,6 +87,7 @@ export default function CreateRoomPage() {
   }
 
   const handleSubmit = async (event: React.FormEvent) => {
+    // Envio del formulario.
     event.preventDefault()
 
     if (!usuario || !validarTodo()) {

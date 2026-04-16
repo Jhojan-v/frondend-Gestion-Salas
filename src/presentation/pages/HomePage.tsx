@@ -14,12 +14,14 @@ import { resolverNombreFacultad } from '../../shared/constants/facultades'
 import { useAuth } from '../../shared/context/AuthContext'
 import './home-page.css'
 
+// Estado base de edicion.
 const emptyEditForm = {
   nombre: '',
   ubicacion: '',
   capacidad: 2,
 }
 
+// Estado base de recursos.
 const emptyResourceForm = {
   codigoRecurso: '',
   nombreRecurso: '',
@@ -80,6 +82,7 @@ function validarNombreRecurso(nombre: string) {
 }
 
 function HomePage() {
+  // Dashboard de secretaria.
   const navigate = useNavigate()
   const { usuario, cerrarSesion } = useAuth()
 
@@ -139,6 +142,7 @@ function HomePage() {
   }, [selectedSalaId, usuario?.idFacultad, usuario?.rol])
 
   async function cargarSalas() {
+    // Listado principal.
     try {
       setLoading(true)
       const data = await listarSalas(usuario)
@@ -171,6 +175,7 @@ function HomePage() {
   }
 
   async function cargarDetalle(idSala: number) {
+    // Detalle de la sala activa.
     try {
       setDetailLoading(true)
       const data = await obtenerSalaDetalle(idSala, usuario)
@@ -216,6 +221,7 @@ function HomePage() {
   }
 
   async function handleEditSubmit(event: FormEvent<HTMLFormElement>) {
+    // HU-05.
     event.preventDefault()
 
     if (!selectedSala || !validarEdicion()) {
@@ -264,6 +270,7 @@ function HomePage() {
   }
 
   async function handleToggleStatus() {
+    // HU-06.
     if (!selectedSala) {
       return
     }
@@ -302,6 +309,7 @@ function HomePage() {
   }
 
   async function handleResourceSubmit(event: FormEvent<HTMLFormElement>) {
+    // HU-07.
     event.preventDefault()
 
     if (!selectedSala || !validarRecurso()) {

@@ -70,6 +70,7 @@ const SALAS_API_URL = `${API_BASE_URL}/api/salas`
 
 const DEFAULT_USER_ID = '1'
 
+// Headers comunes para salas.
 const getHeaders = (usuario: Usuario | null) => ({
   'Content-Type': 'application/json',
   'X-Usuario-Id': DEFAULT_USER_ID,
@@ -87,6 +88,7 @@ async function parseJsonSafe<T>(response: Response): Promise<T | null> {
   return JSON.parse(text) as T
 }
 
+// Unifica mensajes de error.
 function getErrorMessage(payload: ErrorPayload | null, fallback: string) {
   if (!payload) {
     return fallback
@@ -117,6 +119,7 @@ async function handleResponse<T>(response: Response, fallbackError: string) {
   return payload as T
 }
 
+// Helper generico para endpoints de salas.
 async function request<T>(
   url: string,
   usuario: Usuario | null,

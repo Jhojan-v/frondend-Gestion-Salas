@@ -7,6 +7,7 @@ import MisReservasPage from '../presentation/pages/MisReservasPage'
 import RegisterPage from '../presentation/pages/RegisterPage'
 
 function App() {
+  // Rutas base del frontend.
   return (
     <AuthProvider>
       <BrowserRouter>

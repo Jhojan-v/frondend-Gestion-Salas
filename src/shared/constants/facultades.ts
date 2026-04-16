@@ -5,10 +5,12 @@ export const FACULTADES = [
   { id: 4, nombre: 'Facultad de Administracion' },
 ]
 
+// Catalogo local de apoyo.
 export function getNombreFacultad(idFacultad: number | null | undefined) {
   return FACULTADES.find((facultad) => facultad.id === idFacultad)?.nombre ?? ''
 }
 
+// Prioriza backend y cae al catalogo.
 export function resolverNombreFacultad(
   facultad: string | null | undefined,
   idFacultad: number | null | undefined,
