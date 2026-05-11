@@ -1,3 +1,4 @@
+
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { registrarUsuario } from '../../infrastructure/http/authService'
@@ -102,42 +103,31 @@ export default function RegisterPage() {
     return !Object.values(nuevo).some(Boolean)
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-
-    if (!validarTodo()) {
-      return
-    }
-
-    setCargando(true)
-    setAlerta({ tipo: '', mensaje: '' })
-
+    const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validarTodo()) return;
+    setCargando(true);
+    setAlerta({ tipo: "", mensaje: "" });
     try {
       await registrarUsuario({
         nombre: form.nombre.trim(),
         correo: form.correo.trim().toLowerCase(),
         idFacultad: Number(form.idFacultad),
         contrasena: form.contrasena,
-      })
-
-      setAlerta({
-        tipo: 'exito',
-        mensaje: '¡Cuenta creada! Redirigiendo al inicio de sesión...',
-      })
-
-      setTimeout(() => navigate('/login'), 2000)
-    } catch (err: any) {
-      const msg = err.message || ''
-
-      if (msg.toLowerCase().includes('correo') && msg.toLowerCase().includes('registrado')) {
-        setErrores((prev) => ({ ...prev, correo: 'Este correo ya está registrado.' }))
+      });
+      setAlerta({ tipo: "exito", mensaje: "¡Cuenta creada! Redirigiendo al inicio de sesión..." });
+      setTimeout(() => navigate("/login"), 2000);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Error desconocido";
+      if (msg.toLowerCase().includes("correo") && msg.toLowerCase().includes("registrado")) {
+        setErrores((prev) => ({ ...prev, correo: "Este correo ya está registrado." }));
       } else {
-        setAlerta({ tipo: 'error', mensaje: msg || 'Error técnico. Intenta de nuevo.' })
+        setAlerta({ tipo: "error", mensaje: msg || "Error técnico. Intenta de nuevo." });
       }
     } finally {
-      setCargando(false)
+      setCargando(false);
     }
-  }
+  };
 
   return (
     <div className="auth-screen">

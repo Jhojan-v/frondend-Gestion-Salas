@@ -1,0 +1,153 @@
+.my-reservations,
+.my-reservations__list,
+.my-reservations__metrics {
+  display: grid;
+  gap: 1rem;
+}
+
+.my-reservations__metric-card,
+.my-reservations__toolbar,
+.my-reservations__card,
+.my-reservations__empty-card,
+.my-reservations__alert {
+  border-radius: 1.25rem;
+  border: 1px solid #efc7cc;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 22px 46px rgba(143, 20, 32, 0.1);
+}
+
+.my-reservations__metrics {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.my-reservations__metric-card,
+.my-reservations__toolbar,
+.my-reservations__card,
+.my-reservations__empty-card,
+.my-reservations__alert {
+  padding: 1rem 1.05rem;
+}
+
+.my-reservations__metric-card span,
+.my-reservations__status {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.42rem 0.8rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.my-reservations__metric-card span {
+  background: #fff3f4;
+  color: #b31f2e;
+}
+
+.my-reservations__metric-card strong,
+.my-reservations__toolbar h3,
+.my-reservations__card h4 {
+  color: #24171b;
+}
+
+.my-reservations__metric-card strong {
+  display: block;
+  margin: 0.7rem 0 0.45rem;
+  font-size: clamp(1.5rem, 4vw, 2rem);
+}
+
+.my-reservations__metric-card p,
+.my-reservations__toolbar p,
+.my-reservations__card p,
+.my-reservations__empty-card p {
+  color: #6f5b61;
+  line-height: 1.55;
+}
+
+.my-reservations__alert {
+  color: #8f1420;
+  background: #fff1f2;
+}
+
+.my-reservations__toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.my-reservations__toolbar button,
+.my-reservations__cancel {
+  border: none;
+  border-radius: 0.95rem;
+  padding: 0.82rem 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    transform 0.18s ease,
+    opacity 0.18s ease;
+}
+
+.my-reservations__toolbar button {
+  background: #fff;
+  color: #b31f2e;
+  border: 1px solid rgba(179, 31, 46, 0.18);
+}
+
+.my-reservations__cancel {
+  background: linear-gradient(135deg, #b31f2e 0%, #8f1420 100%);
+  color: #fff;
+}
+
+.my-reservations__toolbar button:hover,
+.my-reservations__cancel:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.my-reservations__cancel:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.my-reservations__list {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.my-reservations__card {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.my-reservations__card-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.my-reservations__status.is-active {
+  background: rgba(25, 95, 49, 0.12);
+  color: #195f31;
+}
+
+.my-reservations__status.is-cancelled {
+  background: rgba(179, 31, 46, 0.1);
+  color: #b31f2e;
+}
+
+.my-reservations__details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.my-reservations__empty-card {
+  text-align: center;
+}
+
+@media (min-width: 768px) {
+  .my-reservations__toolbar,
+  .my-reservations__card-head {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+}

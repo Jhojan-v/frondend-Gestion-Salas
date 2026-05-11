@@ -1,57 +1,42 @@
-import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState } from 'react'
 import { crearSala } from '../../infrastructure/http/roomService'
-import { resolverNombreFacultad } from '../../shared/constants/facultades'
+import DashboardShell from '../components/DashboardShell'
 import { useAuth } from '../../shared/context/AuthContext'
-import './create-room-page.css'
-import './home-page.css'
+import './CreateRoomPage.css'
 
-const validarNombre = (valor: string) => {
-  if (!valor.trim()) return 'El nombre es obligatorio.'
-  if (valor.trim().length < 3) return 'Minimo 3 caracteres.'
+const validarNombre = (value: string) => {
+  if (!value.trim()) return 'El nombre es obligatorio.'
+  if (value.trim().length < 3) return 'Minimo 3 caracteres.'
   return ''
 }
 
-const validarUbicacion = (valor: string) => {
-  if (!valor.trim()) return 'La ubicacion es obligatoria.'
+const validarUbicacion = (value: string) => {
+  if (!value.trim()) return 'La ubicacion es obligatoria.'
   return ''
 }
 
-const validarCapacidad = (valor: string) => {
-  if (!valor) return 'La capacidad es obligatoria.'
-  const numero = Number(valor)
-  if (Number.isNaN(numero)) return 'Debe ser un numero.'
-  if (numero < 2 || numero > 100) return 'Debe estar entre 2 y 100.'
+const validarCapacidad = (value: string) => {
+  if (!value) return 'La capacidad es obligatoria.'
+  const num = Number(value)
+  if (Number.isNaN(num)) return 'Debe ser un numero.'
+  if (num < 2 || num > 100) return 'Debe estar entre 2 y 100.'
   return ''
 }
 
 export default function CreateRoomPage() {
-  const navigate = useNavigate()
-  const { usuario, cerrarSesion } = useAuth()
+  const { usuario } = useAuth()
 
-  const [sidebarOpen, setSidebarOpen] = useState(true)
   const [form, setForm] = useState({ nombre: '', ubicacion: '', capacidad: '' })
   const [errores, setErrores] = useState({ nombre: '', ubicacion: '', capacidad: '' })
   const [alerta, setAlerta] = useState({ tipo: '', mensaje: '' })
   const [cargando, setCargando] = useState(false)
 
-  const facultadNombre = resolverNombreFacultad(usuario?.facultad, usuario?.idFacultad)
-
-  useEffect(() => {
-    const root = document.getElementById('root')
-    root?.classList.add('dashboard-root')
-
-    return () => {
-      root?.classList.remove('dashboard-root')
-    }
-  }, [])
-
   const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = event.target
-    setForm((prev) => ({ ...prev, [name]: value }))
+    setForm((current) => ({ ...current, [name]: value }))
 
     if (errores[name as keyof typeof errores]) {
-      setErrores((prev) => ({ ...prev, [name]: '' }))
+      setErrores((current) => ({ ...current, [name]: '' }))
     }
 
     if (alerta.mensaje) {
@@ -61,33 +46,33 @@ export default function CreateRoomPage() {
 
   const handleBlur = (event: React.FocusEvent<HTMLInputElement>) => {
     const { name, value } = event.target
-    const validadores = {
+    const validators = {
       nombre: validarNombre,
       ubicacion: validarUbicacion,
       capacidad: validarCapacidad,
     }
 
-    setErrores((prev) => ({
-      ...prev,
-      [name]: validadores[name as keyof typeof validadores](value),
+    setErrores((current) => ({
+      ...current,
+      [name]: validators[name as keyof typeof validators](value),
     }))
   }
 
   const validarTodo = () => {
-    const nuevo = {
+    const nuevosErrores = {
       nombre: validarNombre(form.nombre),
       ubicacion: validarUbicacion(form.ubicacion),
       capacidad: validarCapacidad(form.capacidad),
     }
 
-    setErrores(nuevo)
-    return !Object.values(nuevo).some(Boolean)
+    setErrores(nuevosErrores)
+    return !Object.values(nuevosErrores).some(Boolean)
   }
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
 
-    if (!usuario || !validarTodo()) {
+    if (!validarTodo() || !usuario) {
       return
     }
 
@@ -95,197 +80,133 @@ export default function CreateRoomPage() {
     setAlerta({ tipo: '', mensaje: '' })
 
     try {
-      await crearSala({
-        nombre: form.nombre.trim(),
-        ubicacion: form.ubicacion.trim(),
-        capacidad: Number(form.capacidad),
-        facultad: facultadNombre,
-      }, usuario)
+      const resultado = await crearSala(
+        {
+          nombre: form.nombre,
+          ubicacion: form.ubicacion,
+          capacidad: Number(form.capacidad),
+          facultad: usuario.facultad,
+        },
+        usuario,
+      )
 
       setAlerta({
         tipo: 'exito',
-        mensaje: `Sala "${form.nombre.trim()}" creada exitosamente.`,
+        mensaje: resultado.modoLocal
+          ? `Sala "${form.nombre}" guardada en modo local.`
+          : `Sala "${form.nombre}" creada exitosamente.`,
       })
       setForm({ nombre: '', ubicacion: '', capacidad: '' })
-    } catch (error: any) {
-      const mensaje = error?.message || ''
+    } catch (err: unknown) {
+      const mensaje = err instanceof Error ? err.message : 'Error desconocido'
+
       if (mensaje.toLowerCase().includes('nombre')) {
-        setErrores((prev) => ({ ...prev, nombre: 'Ya existe una sala con ese nombre.' }))
+        setErrores((current) => ({
+          ...current,
+          nombre: 'Ya existe una sala con ese nombre.',
+        }))
       } else {
-        setAlerta({
-          tipo: 'error',
-          mensaje: mensaje || 'Error tecnico. Intenta de nuevo.',
-        })
+        setAlerta({ tipo: 'error', mensaje })
       }
     } finally {
       setCargando(false)
     }
   }
 
-  if (!usuario || usuario.rol !== 'SECRETARIA') {
-    return (
-      <section className="create-room-access">
-        <div className="create-room-access-card">
-          <h2>Acceso restringido</h2>
-          <p>Solo las secretarias pueden crear salas.</p>
-          <button type="button" className="action-button" onClick={() => navigate('/login')}>
-            Volver al inicio
-          </button>
-        </div>
-      </section>
-    )
-  }
+  const headerAside = (
+    <div className="create-room__metrics">
+      <article className="create-room__metric-card">
+        <span>Capacidad minima</span>
+        <strong>2</strong>
+        <p>La sala debe poder recibir al menos dos personas.</p>
+      </article>
+      <article className="create-room__metric-card">
+        <span>Capacidad maxima</span>
+        <strong>100</strong>
+        <p>El formulario valida automaticamente este limite.</p>
+      </article>
+    </div>
+  )
 
   return (
-    <div className="secretaria-dashboard">
-      <aside className={`dashboard-sidebar ${sidebarOpen ? '' : 'dashboard-sidebar-collapsed'}`}>
-        <button
-          type="button"
-          className="sidebar-toggle"
-          onClick={() => setSidebarOpen((current) => !current)}
-          aria-label={sidebarOpen ? 'Contraer barra lateral' : 'Expandir barra lateral'}
-        >
-          {sidebarOpen ? 'Ocultar' : 'Menu'}
-        </button>
+    <DashboardShell
+      activeKey="create-room"
+      title="Crear sala"
+      subtitle="Registra un nuevo espacio para que quede disponible dentro del sistema de reservas."
+      headerAside={headerAside}
+    >
+      <section className="create-room">
+        <article className="create-room__card">
+          <div className="create-room__head">
+            <div>
+              <h3>Formulario de registro</h3>
+              <p>Los datos se validan antes de enviarse al backend o al fallback local.</p>
+            </div>
+          </div>
 
-        <div className="sidebar-brand">
-          <h2>{sidebarOpen ? 'Sistema de Reservas' : 'SR'}</h2>
-          {sidebarOpen ? <p>Universidad UAO</p> : null}
-        </div>
-
-        <nav className="sidebar-menu">
-          <button
-            type="button"
-            className="sidebar-link"
-            onClick={() => navigate('/dashboard-secretaria')}
-            aria-label="Dashboard secretaria"
-          >
-            <span>{sidebarOpen ? 'Dashboard secretaria' : 'Inicio'}</span>
-          </button>
-          <button
-            type="button"
-            className="sidebar-link"
-            onClick={() => navigate('/mis-reservas')}
-            aria-label="Mis reservas"
-          >
-            <span>{sidebarOpen ? 'Mis reservas' : 'Reservas'}</span>
-          </button>
-          <button
-            type="button"
-            className="sidebar-link sidebar-link-active"
-            aria-label="Crear sala"
-          >
-            <span>{sidebarOpen ? 'Crear sala' : 'Crear'}</span>
-          </button>
-        </nav>
-
-        <div className="sidebar-user">
-          <strong>{usuario.correo}</strong>
-          {sidebarOpen ? (
-            <>
-              <span>{usuario.rol}</span>
-              <span>{facultadNombre}</span>
-            </>
+          {alerta.mensaje ? (
+            <div className={`create-room__alert is-${alerta.tipo}`}>
+              {alerta.mensaje}
+            </div>
           ) : null}
-        </div>
 
-        <button
-          type="button"
-          className="sidebar-logout"
-          onClick={() => {
-            cerrarSesion()
-            navigate('/login')
-          }}
-        >
-          {sidebarOpen ? 'Cerrar sesion' : 'Salir'}
-        </button>
-      </aside>
+          <form className="create-room__form" onSubmit={handleSubmit} noValidate>
+            <label className="create-room__field">
+              <span>Nombre de la sala</span>
+              <input
+                name="nombre"
+                type="text"
+                value={form.nombre}
+                onChange={handleChange}
+                onBlur={handleBlur}
+                placeholder="Ej: Sala A-101"
+              />
+              {errores.nombre ? <small>{errores.nombre}</small> : null}
+            </label>
 
-      <section className="dashboard-main create-room-main">
-        <header className="dashboard-header">
-          <div>
-            <h1>Crear sala de reuniones</h1>
-            <p className="dashboard-subtitle">
-              Registra un nuevo espacio disponible para tu facultad.
-            </p>
-          </div>
+            <label className="create-room__field">
+              <span>Ubicacion</span>
+              <input
+                name="ubicacion"
+                type="text"
+                value={form.ubicacion}
+                onChange={handleChange}
+                onBlur={handleBlur}
+                placeholder="Ej: Bloque B, Piso 2"
+              />
+              {errores.ubicacion ? <small>{errores.ubicacion}</small> : null}
+            </label>
 
-          <div className="dashboard-header-card">
-            <span>Facultad</span>
-            <strong>{facultadNombre}</strong>
-            <p>La sala quedara asociada a la facultad de la sesion activa.</p>
-          </div>
-        </header>
+            <label className="create-room__field">
+              <span>Capacidad</span>
+              <input
+                name="capacidad"
+                type="number"
+                value={form.capacidad}
+                onChange={handleChange}
+                onBlur={handleBlur}
+                min={2}
+                max={100}
+                placeholder="Ej: 20"
+              />
+              {errores.capacidad ? <small>{errores.capacidad}</small> : null}
+            </label>
 
-        <section className="create-room-wrapper">
-          <article className="dashboard-card create-room-card">
-            {alerta.mensaje ? (
-              <div className={`dashboard-alert dashboard-alert-${alerta.tipo || 'info'}`}>
-                {alerta.mensaje}
-              </div>
-            ) : null}
-
-            <form className="create-room-form" onSubmit={handleSubmit} noValidate>
-              <label className="dashboard-field">
-                <span>Nombre de la sala</span>
-                <input
-                  name="nombre"
-                  type="text"
-                  value={form.nombre}
-                  onChange={handleChange}
-                  onBlur={handleBlur}
-                  placeholder="Ej: Sala A-101"
-                />
-                {errores.nombre ? <small>{errores.nombre}</small> : null}
-              </label>
-
-              <label className="dashboard-field">
-                <span>Ubicacion</span>
-                <input
-                  name="ubicacion"
-                  type="text"
-                  value={form.ubicacion}
-                  onChange={handleChange}
-                  onBlur={handleBlur}
-                  placeholder="Ej: Bloque B, Piso 2"
-                />
-                {errores.ubicacion ? <small>{errores.ubicacion}</small> : null}
-              </label>
-
-              <label className="dashboard-field">
-                <span>Capacidad (entre 2 y 100 personas)</span>
-                <input
-                  name="capacidad"
-                  type="number"
-                  min={2}
-                  max={100}
-                  value={form.capacidad}
-                  onChange={handleChange}
-                  onBlur={handleBlur}
-                  placeholder="Ej: 20"
-                />
-                {errores.capacidad ? <small>{errores.capacidad}</small> : null}
-              </label>
-
-              <div className="create-room-actions">
-                <button type="submit" className="action-button create-room-submit" disabled={cargando}>
-                  {cargando ? 'Creando sala...' : 'Crear sala'}
-                </button>
-                <button
-                  type="button"
-                  className="create-room-cancel"
-                  onClick={() => {
-                    setForm({ nombre: '', ubicacion: '', capacidad: '' })
-                    setErrores({ nombre: '', ubicacion: '', capacidad: '' })
-                  }}
-                >
-                  Cancelar
-                </button>
-              </div>
-            </form>
-          </article>
-        </section>
+            <div className="create-room__actions">
+              <button type="submit" disabled={cargando}>
+                {cargando ? 'Creando sala...' : 'Crear sala'}
+              </button>
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => setForm({ nombre: '', ubicacion: '', capacidad: '' })}
+              >
+                Limpiar formulario
+              </button>
+            </div>
+          </form>
+        </article>
       </section>
-    </div>
+    </DashboardShell>
   )
 }

@@ -1,6 +1,8 @@
+
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { iniciarSesion } from '../../infrastructure/http/authService'
+import { obtenerRutaDashboard } from '../../shared/auth/roles'
 import { resolverNombreFacultad } from '../../shared/constants/facultades'
 import { useAuth } from '../../shared/context/AuthContext'
 import '../../styles/RegisterPage.css'
@@ -57,52 +59,35 @@ export default function LoginPage() {
     return !Object.values(nuevo).some(Boolean)
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-
-    if (!validarTodo()) {
-      return
-    }
-
-    setCargando(true)
-    setAlerta({ tipo: '', mensaje: '' })
-
+    const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validarTodo()) return;
+    setCargando(true);
+    setAlerta({ tipo: "", mensaje: "" });
     try {
       const data = await iniciarSesion({
         correo: form.correo.trim().toLowerCase(),
         contrasena: form.contrasena,
-      })
-
+      });
       guardarSesion({
         correo: data.correo,
         facultad: resolverNombreFacultad(data.facultad, data.idFacultad),
         idFacultad: data.idFacultad,
+        idUsuario: data.idUsuario,
         rol: data.rol,
         token: data.token,
-      })
-
-      setAlerta({
-        tipo: 'exito',
-        mensaje: `¡Bienvenido! Ingresando como ${data.rol}...`,
-      })
-
+      });
+      setAlerta({ tipo: "exito", mensaje: `¡Bienvenido! Ingresando como ${data.rol}...` });
       setTimeout(() => {
-        if (data.rol === 'SECRETARIA') {
-          navigate('/dashboard-secretaria')
-          return
-        }
-
-        navigate('/dashboard-docente')
-      }, 1500)
-    } catch (err: any) {
-      setAlerta({
-        tipo: 'error',
-        mensaje: err.message || 'Correo o contraseña incorrectos.',
-      })
+        navigate(obtenerRutaDashboard({ rol: data.rol }));
+      }, 1500);
+    } catch (err: unknown) {
+      const mensaje = err instanceof Error ? err.message : "Correo o contraseña incorrectos.";
+      setAlerta({ tipo: "error", mensaje: mensaje });
     } finally {
-      setCargando(false)
+      setCargando(false);
     }
-  }
+  };
 
   return (
     <div className="auth-screen">

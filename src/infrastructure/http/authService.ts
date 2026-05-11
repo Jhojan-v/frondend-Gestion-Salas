@@ -1,6 +1,11 @@
-import { API_BASE_URL } from './apiConfig'
+import { resolveUsuarioId } from '../../shared/auth/usuarioSesion'
+import { API_BASE_URL, getBackendUnavailableMessage } from './apiConfig'
 
 type LoginResponse = {
+  id?: number | string
+  idUsuario?: number | string
+  usuarioId?: number | string
+  id_usuario?: number | string
   correo?: string
   email?: string
   rol?: string
@@ -29,7 +34,7 @@ export const registrarUsuario = async (datos: {
       }),
     })
   } catch {
-    throw new Error('No fue posible conectar con el backend en http://localhost:8080.')
+    throw new Error(getBackendUnavailableMessage())
   }
 
   const texto = await response.text()
@@ -69,7 +74,7 @@ export const iniciarSesion = async (datos: {
       method: 'POST',
     })
   } catch {
-    throw new Error('No fue posible conectar con el backend en http://localhost:8080.')
+    throw new Error(getBackendUnavailableMessage())
   }
 
   const rawBody = await response.text()
@@ -91,6 +96,10 @@ export const iniciarSesion = async (datos: {
   }
 
   return {
+    idUsuario: resolveUsuarioId({
+      idUsuario: data.idUsuario ?? data.usuarioId ?? data.id_usuario ?? data.id ?? null,
+      token: data.token,
+    }),
     correo: data.correo ?? data.email ?? datos.correo,
     rol: data.rol ?? 'DOCENTE',
     idFacultad: data.idFacultad ?? null,
